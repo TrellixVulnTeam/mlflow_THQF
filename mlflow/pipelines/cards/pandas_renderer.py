@@ -90,7 +90,7 @@ def convert_to_dataset_feature_statistics(
     feature_stats.num_examples = len(df)
     quantiles_to_get = [x * 10 / 100 for x in range(10 + 1)]
     try:
-        quantiles = df.quantile(quantiles_to_get)
+        quantiles = df.select_dtypes(exclude=["bool"]).quantile(quantiles_to_get)
     except:
         raise MlflowException("Error in generating quantiles")
 
@@ -136,11 +136,17 @@ def convert_to_dataset_feature_statistics(
                 if equal_height_hist:
                     feat_stats.histograms.append(equal_height_hist)
         elif feat.type == fs_proto.STRING:
+            isCurrentColumnBooleanType = False
+            if current_column_value.dtype == bool:
+                current_column_value = current_column_value.replace({True: "True", False: "False"})
+                isCurrentColumnBooleanType = True
             feat_stats = feat.string_stats
             strs = current_column_value.dropna()
 
             histogram_categorical_levels_count = None
-            feat_stats.avg_length = np.mean(np.vectorize(len)(strs))
+            feat_stats.avg_length = (
+                np.mean(np.vectorize(len)(strs)) if not isCurrentColumnBooleanType else 0
+            )
             vals, counts = np.unique(strs, return_counts=True)
             feat_stats.unique = pandas_describe_key.get("unique", len(vals))
             sorted_vals = sorted(zip(counts, vals), reverse=True)
